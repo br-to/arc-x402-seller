@@ -1,0 +1,27 @@
+{
+  "name": "arc-x402-seller",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Arc Facilitator / x402 seller spike (Circle Gateway testnet, no local relayer key)",
+  "scripts": {
+    "start": "tsx server.ts",
+    "server": "tsx server.ts",
+    "pay": "tsx buyer.ts",
+    "deposit": "tsx deposit.ts"
+  },
+  "dependencies": {
+    "@circle-fin/x402-batching": "^2.0.4",
+    "@x402/core": "^2.0.0",
+    "@x402/evm": "^2.0.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "viem": "^2.47.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
