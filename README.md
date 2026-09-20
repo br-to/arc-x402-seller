@@ -26,7 +26,6 @@ Copy `.env.example` → `.env` and fill values. Never commit `.env`.
 ## Install & run seller
 
 ```bash
-cd /workspace/arc-x402-seller
 npm install
 export SELLER_WALLET_ADDRESS=0xYourSellerAddress   # or put in .env
 npm start
@@ -43,7 +42,7 @@ curl -i http://localhost:3000/premium
 Expect:
 
 - HTTP `402 Payment Required`
-- Header `PAYMENT-REQUIRED` (base64 JSON with `accepts[]`, scheme Gateway / `GatewayWalletBatched`, network `eip155:5042002`)
+- Header `PAYMENT-REQUIRED` (base64 JSON with `accepts[]`: `scheme: "exact"`, `extra.name: "GatewayWalletBatched"`, network `eip155:5042002`, amount `10000` = $0.01 USDC)
 
 Decode the header:
 
@@ -55,7 +54,7 @@ curl -s -D - http://localhost:3000/premium -o /dev/null \
 
 ## Demo: paid → settle success
 
-Live settle needs a **buyer EOA with Gateway balance** on Arc Testnet (faucet + deposit). Seller still has no relayer key.
+Live settle needs a **buyer with Gateway balance** on Arc Testnet (faucet + deposit): either an EOA (below) or a [Circle Agent Wallet](#alternative-pay-with-a-circle-agent-wallet-no-private-key-in-env). Seller still has no relayer key.
 
 ### 1. Fund buyer
 
@@ -81,6 +80,45 @@ npm run pay
 2. Signs EIP-3009 against Gateway Wallet (gasless)
 3. Retries with `PAYMENT-SIGNATURE`
 4. Seller middleware calls Gateway `settle` → `200` JSON
+
+### Alternative: pay with a Circle Agent Wallet (no private key in `.env`)
+
+Instead of an EOA key, the buyer can be a [Circle Agent Wallet](https://developers.circle.com/agent-stack/agent-wallets) driven by the Circle CLI. Keys are held by Circle via 2-of-2 MPC and are never exposed to the agent. Verified with `@circle-fin/cli` 1.1.3 (Node.js 20.18.2+).
+
+```bash
+# 1. Install the CLI and log in (email OTP; wallets are created on first login)
+npm install -g @circle-fin/cli
+circle wallet login you@example.com --testnet
+
+# 2. Find your Agent Wallet address, then fund it (faucet drips 20 USDC)
+circle wallet list --type agent --chain ARC-TESTNET
+circle wallet fund --address 0xYourAgentWallet --chain ARC-TESTNET
+
+# 3. Deposit into Gateway (on-chain; uses USDC gas on Arc)
+circle gateway deposit --amount 5 --address 0xYourAgentWallet --chain ARC-TESTNET --method direct
+circle gateway balance --address 0xYourAgentWallet --chain ARC-TESTNET
+```
+
+Then start the seller (`SELLER_WALLET_ADDRESS` can be any address you control) and pay with the CLI:
+
+```bash
+# Show payment requirements without paying
+circle services pay http://localhost:3000/premium \
+  --address 0xYourAgentWallet --chain ARC-TESTNET --estimate
+
+# Pay; refuses if the price exceeds --max-amount
+circle services pay http://localhost:3000/premium \
+  --address 0xYourAgentWallet --chain ARC-TESTNET --max-amount 0.01
+```
+
+Notes from testing:
+
+- Use `--chain ARC-TESTNET` everywhere. The docs mix `ARC` and `ARC-TESTNET`; `ARC` is Arc mainnet.
+- `services pay` works against `localhost`; no tunnel needed.
+- Agent Wallets are smart contract accounts (ERC-4337), but the `paid_by` address in the settled response is a different, code-less address (EOA). The docs don't explain the relationship.
+- Wallet-layer spending policies (`circle wallet limit`) are **mainnet only**. On testnet, `--max-amount` is the only guard.
+- The response `transaction` is a Gateway settlement ID (UUID), not an on-chain tx hash. Balance drops immediately (5 → 4.99 USDC); on-chain settlement is batched later.
+- `wallet execute` can call any contract from the Agent Wallet, e.g. the ERC-8183 `AgenticCommerce` reference contract on Arc Testnet (`0x0747EEf0706327138c69792bF28Cd525089e4583`); see [Create your first ERC-8183 job](https://docs.arc.io/arc/tutorials/create-your-first-erc-8183-job).
 
 ### Manual Payment-Signature (advanced)
 
@@ -110,7 +148,7 @@ USDC is the native gas token on Arc; faucet funds both deposits and gas.
 ## Layout
 
 ```
-/workspace/arc-x402-seller
+arc-x402-seller
 ├── server.ts       # Express + createGatewayMiddleware
 ├── buyer.ts        # GatewayClient.pay settle demo
 ├── deposit.ts      # Buyer USDC → Gateway deposit
