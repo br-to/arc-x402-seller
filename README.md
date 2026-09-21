@@ -1,5 +1,7 @@
 # arc-x402-seller
 
+English | [日本語](README.ja.md)
+
 Minimal **Arc Facilitator / x402 seller** spike for Circle Gateway nanopayments on **Arc Testnet** (`eip155:5042002`).
 
 - Seller uses hosted facilitator: `https://gateway-api-testnet.circle.com`
